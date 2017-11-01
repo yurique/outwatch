@@ -10,6 +10,9 @@ final case class GenericMappedEmitterBuilder[T,E](constructor: Observer[E] => Em
   def -->[U >: T](sink: Sink[U]): IO[Emitter] = {
     IO.pure(constructor(sink.redirectMap(mapping).observer))
   }
+  def -->[U >: T](sinkIO: IO[Sink[U]]): IO[Emitter] = {
+    sinkIO.flatMap(-->[U])
+  }
 }
 
 final case class FilteredGenericMappedEmitterBuilder[T,E](
@@ -19,6 +22,9 @@ final case class FilteredGenericMappedEmitterBuilder[T,E](
 ) {
   def -->[U >: T](sink: Sink[U]): IO[Emitter] = {
     IO.pure(constructor(sink.redirect[E](_.filter(predicate).map(mapping)).observer))
+  }
+  def -->[U >: T](sinkIO: IO[Sink[U]]): IO[Emitter] = {
+    sinkIO.flatMap(-->[U])
   }
 }
 
@@ -38,11 +44,16 @@ final case class FilteredWithLatestFromEmitterBuilder[T, E <: Event](
     val proxy: Sink[E] = sink.redirect(_.filter(predicate).withLatestFromWith(stream)((_, u) => u))
     IO.pure(EventEmitter(eventType, proxy.observer))
   }
+  def -->[U >: T](sinkIO: IO[Sink[U]]): IO[EventEmitter[E]] = {
+    sinkIO.flatMap(-->[U])
+  }
 }
 
 final case class FilteredEmitterBuilder[E](eventType: String, predicate: E => Boolean) {
-  def -->(sink: Sink[E]) =
+  def -->(sink: Sink[E]):IO[EventEmitter[Event with E]] =
     IO.pure(EventEmitter(eventType, sink.redirect[E](_.filter(predicate)).observer))
+
+  def -->(sinkIO: IO[Sink[E]]):IO[EventEmitter[Event with E]] = sinkIO.flatMap(-->)
 
   def apply[T](t: T) =
     FilteredGenericMappedEmitterBuilder(EventEmitter(eventType, _:Observer[E]), (_: E) => t, predicate)
@@ -54,8 +65,11 @@ final case class FilteredEmitterBuilder[E](eventType: String, predicate: E => Bo
 }
 
 final class EventEmitterBuilder[E <: Event](val eventType: String) extends AnyVal {
-  def -->(sink: Sink[E]) =
+  def -->(sink: Sink[E]):IO[EventEmitter[E]] =
     IO.pure(EventEmitter(eventType, sink.observer))
+
+  def -->(sinkIO: IO[Sink[E]]):IO[EventEmitter[E]] =
+    sinkIO.flatMap(-->)
 
   def apply[T](t: T) =
     GenericMappedEmitterBuilder(EventEmitter(eventType, _:Observer[E]), (_: E) => t)
@@ -69,24 +83,32 @@ final class EventEmitterBuilder[E <: Event](val eventType: String) extends AnyVa
 }
 
 final class StringEventEmitterBuilder(val eventType: String) extends AnyVal {
-  def -->(sink: Sink[String]) =
+  def -->(sink: Sink[String]):IO[StringEventEmitter] =
     IO.pure(StringEventEmitter(eventType, sink.observer))
+
+  def -->(sinkIO: IO[Sink[String]]):IO[StringEventEmitter] = sinkIO.flatMap(-->)
 
   def apply[T](f: String => T) =
     GenericMappedEmitterBuilder(StringEventEmitter(eventType, _: Observer[String]), f)
 }
 
 final class BoolEventEmitterBuilder(val eventType: String) extends AnyVal {
-  def -->(sink: Sink[Boolean]) =
+  def -->(sink: Sink[Boolean]):IO[BoolEventEmitter] =
     IO.pure(BoolEventEmitter(eventType, sink.observer))
+
+  def -->(sinkIO: IO[Sink[Boolean]]):IO[BoolEventEmitter] =
+    sinkIO.flatMap(-->)
 
   def apply[T](f: Boolean => T) =
     GenericMappedEmitterBuilder(BoolEventEmitter(eventType, _: Observer[Boolean]), f)
 }
 
 final class NumberEventEmitterBuilder(val eventType: String) extends AnyVal {
-  def -->(sink: Sink[Double]) =
+  def -->(sink: Sink[Double]):IO[NumberEventEmitter] =
     IO.pure(NumberEventEmitter(eventType, sink.observer))
+
+  def -->(sinkIO: IO[Sink[Double]]):IO[NumberEventEmitter] =
+    sinkIO.flatMap(-->)
 
   def apply[T](f: Double => T) =
     GenericMappedEmitterBuilder(NumberEventEmitter(eventType, _: Observer[Double]), f)
@@ -94,12 +116,15 @@ final class NumberEventEmitterBuilder(val eventType: String) extends AnyVal {
 
 object InsertHookBuilder {
   def -->(sink: Sink[Element]) = IO.pure(InsertHook(sink.observer))
+  def -->(sinkIO: IO[Sink[Element]]):IO[InsertHook] = sinkIO.flatMap(-->)
 }
 
 object DestroyHookBuilder {
-  def -->(sink: Sink[Element]) = IO.pure(DestroyHook(sink.observer))
+  def -->(sink: Sink[Element]):IO[DestroyHook] = IO.pure(DestroyHook(sink.observer))
+  def -->(sinkIO: IO[Sink[Element]]):IO[DestroyHook] = sinkIO.flatMap(-->)
 }
 
 object UpdateHookBuilder {
-  def -->(sink: Sink[(Element, Element)]) = IO.pure(UpdateHook(sink.observer))
+  def -->(sink: Sink[(Element, Element)]):IO[UpdateHook] = IO.pure(UpdateHook(sink.observer))
+  def -->(sinkIO: IO[Sink[(Element, Element)]]):IO[UpdateHook] = sinkIO.flatMap(-->)
 }

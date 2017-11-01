@@ -17,6 +17,7 @@ trait ValueBuilder[T] extends Any {
   def <--(valueStream: Observable[T]) = {
     IO.pure(AttributeStreamReceiver(attributeName, valueStream.map(assign)))
   }
+  def <--(valueStreamIO: IO[Observable[T]]):IO[AttributeStreamReceiver] = valueStreamIO.flatMap(<--)
 }
 
 object ChildStreamReceiverBuilder {

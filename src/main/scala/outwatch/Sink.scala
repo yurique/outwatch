@@ -20,6 +20,8 @@ sealed trait Sink[-T] extends Any {
     observable.subscribe(observer)
   }
 
+  def <--(observableIO: IO[Observable[T]]): IO[Subscription] = observableIO.flatMap(<--)
+
   private[outwatch] def observer: Observer[T]
 
   /**
