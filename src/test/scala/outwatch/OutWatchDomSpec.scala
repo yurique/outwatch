@@ -291,8 +291,6 @@ class OutWatchDomSpec extends UnitSpec with BeforeAndAfterEach {
   }
 
   it should "change the value of a textfield" in {
-
-
     val messages = Subject[String]
     val vtree = div(
       input(outwatch.dom.value <-- messages, id := "input")
@@ -316,7 +314,46 @@ class OutWatchDomSpec extends UnitSpec with BeforeAndAfterEach {
     messages.next(message2)
 
     field.value shouldBe message2
+  }
 
+  it should "render child nodes in correct order" in {
+    val messagesA = Subject[String]
+    val messagesB = Subject[String]
+    val vNode = div(
+      span("A"),
+      child <-- messagesA.map(span(_)),
+      span("B"),
+      child <-- messagesB.map(span(_))
+    )
+
+    val node = document.createElement("div")
+    document.body.appendChild(node)
+    DomUtils.render(node, vNode).unsafeRunSync()
+
+    messagesA.next("1")
+    messagesB.next("2")
+
+    node.innerHTML shouldBe "<div><span>A</span><span>1</span><span>B</span><span>2</span></div>"
+  }
+
+  it should "render child string-nodes in correct order" in {
+    val messagesA = Subject[String]
+    val messagesB = Subject[String]
+    val vNode = div(
+      "A",
+      child <-- messagesA,
+      "B",
+      child <-- messagesB
+    )
+
+    val node = document.createElement("div")
+    document.body.appendChild(node)
+    DomUtils.render(node, vNode).unsafeRunSync()
+
+    messagesA.next("1")
+    messagesB.next("2")
+
+    node.innerHTML shouldBe "<div>A1B2</div>"
   }
 
   it should "update merged nodes children correctly" in {
